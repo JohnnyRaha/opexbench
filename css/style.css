@@ -1,0 +1,131 @@
+:root {
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --line: #d5d9e0;
+  --text: #1d2430;
+  --muted: #667085;
+  --accent: #1f6fb2;
+  --accent-soft: #e6f0f9;
+  --head: #eef1f5;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; overflow: hidden; }
+body {
+  display: flex; flex-direction: column;
+  font: 14px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
+  color: var(--text); background: var(--bg);
+}
+button, select, input { font: inherit; color: inherit; }
+
+/* ---------- menu bar ---------- */
+#menubar {
+  display: flex; align-items: center; gap: 18px;
+  padding: 0 14px; height: 40px; flex: none;
+  background: #1d2a3a; color: #fff;
+}
+.brand { font-weight: 600; letter-spacing: .3px; }
+#menus { display: flex; height: 100%; }
+.menu { position: relative; height: 100%; }
+.menu > button {
+  height: 100%; padding: 0 14px; border: 0; background: none; color: #fff; cursor: pointer;
+}
+.menu > button:hover, .menu.open > button { background: #2f415a; }
+.menu-list {
+  display: none; position: absolute; top: 100%; left: 0; z-index: 20;
+  min-width: 250px; max-height: calc(100vh - 60px); overflow: auto;
+  padding: 6px 0; background: var(--panel); color: var(--text);
+  border: 1px solid var(--line); border-radius: 0 0 6px 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+}
+.menu.open .menu-list { display: block; }
+.menu-list h4 {
+  margin: 8px 0 2px; padding: 0 14px; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .6px; color: var(--muted);
+}
+.menu-list button {
+  display: block; width: 100%; padding: 6px 14px 6px 22px;
+  border: 0; background: none; text-align: left; cursor: pointer;
+}
+.menu-list button:hover { background: var(--accent-soft); }
+
+/* ---------- layout ---------- */
+main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+#session-pane { flex: 1; display: flex; flex-direction: column; min-height: 80px; }
+#sheet-pane { height: 38vh; display: flex; flex-direction: column; min-height: 80px; flex: none; }
+#divider { height: 6px; background: var(--line); cursor: row-resize; flex: none; }
+#divider:hover { background: var(--accent); }
+.pane-title {
+  display: flex; align-items: center; gap: 12px; flex: none;
+  padding: 4px 12px; font-size: 12px; font-weight: 600;
+  background: var(--head); border-bottom: 1px solid var(--line);
+}
+.pane-title .hint { font-weight: 400; color: var(--muted); }
+.pane-title button {
+  margin-left: auto; padding: 1px 10px; font-size: 12px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--panel);
+}
+
+/* ---------- session ---------- */
+#session { position: relative; flex: 1; overflow: auto; padding: 14px; }
+#welcome { max-width: 620px; margin: 30px auto; text-align: center; color: var(--muted); }
+#welcome h2 { color: var(--text); font-weight: 600; }
+#welcome button, .dlg-actions button.primary {
+  padding: 7px 18px; border: 0; border-radius: 5px; background: var(--accent); color: #fff; cursor: pointer;
+}
+.result {
+  max-width: 1000px; margin: 0 auto 14px; padding: 14px 18px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+}
+.result > header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.result h3 { margin: 0; font-size: 16px; color: var(--accent); }
+.result time { font-size: 12px; color: var(--muted); }
+.result .close { margin-left: auto; border: 0; background: none; font-size: 18px; color: var(--muted); cursor: pointer; }
+.result h4 { margin: 14px 0 4px; font-size: 13px; }
+.result p { margin: 4px 0; }
+.result .note { color: var(--muted); font-size: 13px; }
+.tbl-wrap { overflow-x: auto; }
+.result table { border-collapse: collapse; margin: 4px 0; font-variant-numeric: tabular-nums; }
+.result th, .result td { padding: 3px 14px 3px 0; text-align: right; white-space: nowrap; }
+.result th { font-weight: 600; border-bottom: 1px solid var(--line); }
+.result th:first-child, .result td:first-child { text-align: left; }
+.result td.l, .result th.l { text-align: left; }
+.plot { width: 100%; margin-top: 8px; }
+
+/* ---------- worksheet ---------- */
+#grid-wrap { flex: 1; overflow: auto; background: var(--panel); }
+#grid { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
+#grid th, #grid td {
+  border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  height: 24px; padding: 0 6px; white-space: nowrap;
+}
+#grid th { background: var(--head); font-weight: 500; font-size: 12px; color: var(--muted); }
+#grid thead th { position: sticky; top: 0; z-index: 2; min-width: 92px; }
+#grid thead tr.names td { position: sticky; top: 24px; z-index: 2; background: #f8f3df; font-weight: 600; }
+#grid th.rownum { position: sticky; left: 0; z-index: 1; min-width: 44px; text-align: right; }
+#grid thead th.rownum { z-index: 3; }
+#grid td { min-width: 92px; max-width: 220px; overflow: hidden; outline: none; text-align: right; }
+#grid td.text { text-align: left; }
+#grid td:focus { box-shadow: inset 0 0 0 2px var(--accent); }
+
+/* ---------- dialog ---------- */
+dialog {
+  width: min(480px, 94vw); padding: 0; border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, .28); color: var(--text);
+}
+dialog::backdrop { background: rgba(20, 28, 40, .35); }
+dialog h3 { margin: 0; padding: 12px 18px; font-size: 15px; background: var(--head); border-bottom: 1px solid var(--line); }
+.dlg-body { padding: 14px 18px; max-height: 65vh; overflow: auto; }
+.field { margin-bottom: 11px; }
+.field[hidden] { display: none; }
+.field > label { display: block; margin-bottom: 3px; font-size: 13px; font-weight: 600; }
+.field select, .field input[type=number], .field input[type=text] {
+  width: 100%; padding: 5px 7px; border: 1px solid var(--line); border-radius: 4px; background: #fff;
+}
+.field.check > label { display: flex; align-items: center; gap: 7px; font-weight: 400; }
+.checklist { max-height: 132px; overflow: auto; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; }
+.checklist label { display: flex; align-items: center; gap: 7px; font-weight: 400; padding: 1px 0; }
+.dlg-error { margin: 0 18px 10px; padding: 7px 10px; border-radius: 4px; background: #fdecea; color: #a1281c; font-size: 13px; }
+.dlg-error:empty { display: none; }
+.dlg-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 18px; border-top: 1px solid var(--line); }
+.dlg-actions button { padding: 6px 18px; border: 1px solid var(--line); border-radius: 5px; background: #fff; cursor: pointer; }

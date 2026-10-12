@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StatBench</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header id="menubar">
+    <span class="brand">StatBench</span>
+    <nav id="menus"></nav>
+  </header>
+
+  <main>
+    <section id="session-pane">
+      <div class="pane-title">Session <button id="clear-session" type="button">Clear</button></div>
+      <div id="session">
+        <div id="welcome">
+          <h2>Statistical tests and graphs in your browser</h2>
+          <p>Type or paste data into the worksheet below, or open a CSV file from the <b>File</b> menu.
+            Then pick an analysis from <b>Stat</b> or a plot from <b>Graph</b>. Results appear here.</p>
+          <button id="welcome-sample" type="button">Load sample data</button>
+        </div>
+      </div>
+    </section>
+    <div id="divider" title="Drag to resize"></div>
+    <section id="sheet-pane">
+      <div class="pane-title">Worksheet <span class="hint">Row under the column IDs holds column names · paste from a spreadsheet with Ctrl+V</span></div>
+      <div id="grid-wrap"><table id="grid"></table></div>
+    </section>
+  </main>
+
+  <dialog id="dialog"></dialog>
+  <input type="file" id="file-input" accept=".csv,.tsv,.txt" hidden>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.6/jstat.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/sheet.js"></script>
+  <script src="js/analyses.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

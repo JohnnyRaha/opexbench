@@ -857,5 +857,9 @@ const Analyses = (function () {
     'Machine Learning': [['', ['classify', 'mlreg']]]
   };
 
-  return { all: A, MENU };
+  // Building blocks shared with the Lean Six Sigma definitions in lss.js.
+  const kit = { M, S, g, f2, pf, pct, H, P, Note, T, Plot, need, vals, natural, complete, splitBy, COLORS, axis, layout,
+    conf, alt, numCols, byField, binning, tally, categoryPlot, probabilityPlot, Html: html => ({ html }) };
+
+  return { all: A, MENU, kit };
 })();

@@ -25,7 +25,8 @@
         const html = '<table><thead><tr>' + t.head.map((h, j) => `<th${cls(j)}>${esc(h)}</th>`).join('') + '</tr></thead><tbody>'
           + t.rows.map(r => '<tr>' + r.map((c, j) => `<td${cls(j)}>${esc(c)}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
         card.append(el('div', { className: 'tbl-wrap' }, html));
-      } else if (b.plot) {
+      } else if (b.html) card.append(el('div', { className: 'html-block' }, b.html));
+      else if (b.plot) {
         const div = el('div', { className: 'plot' });
         card.append(div);
         plots.push([div, b.plot]);
@@ -53,6 +54,7 @@
       if (f.type === 'check') row.innerHTML = `<label><input type="checkbox" id="${id}"${f.def ? ' checked' : ''}> ${esc(f.label)}</label>`;
       else if (f.type === 'select') row.innerHTML = `<label for="${id}">${esc(f.label)}</label><select id="${id}">`
         + f.options.map(o => `<option value="${o[0]}"${o[0] === f.def ? ' selected' : ''}>${esc(o[1])}</option>`).join('') + '</select>';
+      else if (f.type === 'text') row.innerHTML = `<label for="${id}">${esc(f.label)}</label><input type="text" id="${id}" value="${esc(f.def || '')}">`;
       else if (f.type === 'num') row.innerHTML = `<label for="${id}">${esc(f.label)}</label><input type="number" step="any" id="${id}" value="${f.def != null ? f.def : ''}">`;
       else {
         const ch = columnChoices(f), none = `<i>No ${f.numeric ? 'numeric ' : ''}columns with data</i>`;
@@ -72,6 +74,7 @@
         const c = ctl(n);
         if (f.type === 'check') v[f.key] = c.checked;
         else if (f.type === 'select') v[f.key] = c.value;
+        else if (f.type === 'text') v[f.key] = c.value.trim();
         else if (f.type === 'num') v[f.key] = c.value.trim() === '' ? null : Number(c.value);
         else if (f.type === 'col') v[f.key] = c.value === '' ? null : +c.value;
         else v[f.key] = [...c.querySelectorAll('input:checked')].map(i => +i.value);
@@ -88,6 +91,7 @@
         const x = v[f.key];
         if (f.type === 'col' && x == null && !f.optional) return `Choose a column for "${f.label}".`;
         if (f.type === 'cols' && x.length < (f.min || 1)) return `Choose at least ${f.min || 1} column(s) for "${f.label}".`;
+        if (f.type === 'text' && !x && !f.optional) return `Enter a value for "${f.label}".`;
         if (f.type === 'num') {
           if (x == null) { if (!f.optional) return `Enter a value for "${f.label}".`; continue; }
           if (!isFinite(x) || (f.min != null && x < f.min) || (f.max != null && x > f.max) || (f.integer && !Number.isInteger(x)))
@@ -130,6 +134,8 @@
     }],
     ['Load sample data: bottling line', () => { if (confirmReplace()) Sheet.sample(); }],
     ['Load sample data: coffee lots (machine learning)', () => { if (confirmReplace()) Sheet.sampleML(); }],
+    ['Load sample data: quality tools (subgroups, gage study, defects)', () => { if (confirmReplace()) Sheet.sampleQuality(); }],
+    ['Load sample data: invoice process (event log)', () => { if (confirmReplace()) Sheet.sampleProcess(); }],
     ['Clear worksheet', () => { if (confirmReplace()) Sheet.clear(); }]
   ];
   const confirmReplace = () => !Sheet.used().length || confirm('Replace the current worksheet?');
@@ -168,8 +174,24 @@
     });
   }
 
+  // ---------- views ----------
+  function setView(view) {
+    $('project-view').hidden = view !== 'project';
+    $('analysis-view').hidden = view === 'project';
+    $('menus').style.visibility = view === 'project' ? 'hidden' : '';
+    document.querySelectorAll('#view-switch button').forEach(b => b.classList.toggle('on', b.dataset.view === view));
+    try { localStorage.setItem('statslab.view', view); } catch (e) { /* storage unavailable */ }
+    if (view === 'project') Project.render(); else window.dispatchEvent(new Event('resize'));
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     Sheet.init();
+    Project.init();
+    document.querySelectorAll('#view-switch button').forEach(b => { b.onclick = () => setView(b.dataset.view); });
+    let view = 'analysis';
+    try { view = localStorage.getItem('statslab.view') || view; } catch (e) { /* ignore */ }
+    setView(view);
+    $('welcome-process').onclick = () => { if (confirmReplace()) Sheet.sampleProcess(); };
     buildMenus();
     initDivider();
     $('welcome-sample').onclick = () => { if (confirmReplace()) Sheet.sample(); };
@@ -182,5 +204,5 @@
     });
   });
 
-  window.StatsLab = { addOutput, openDialog };
+  window.StatsLab = { addOutput, openDialog, setView };
 })();

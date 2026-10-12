@@ -37,7 +37,36 @@ Then go to http://localhost:8765. An internet connection is needed on first load
 
 Predictors can be numeric or text (text columns become indicator variables). Tree models report predictor importance; linear and logistic models report standardized coefficients. Predictions can be written back to the worksheet, including for rows that have predictors but no response. Splits and forests are seeded, so results are repeatable. Models train in the browser tab, so they suit data up to a few thousand rows.
 
+## Lean Six Sigma
+
+**Quality** — the measurement and control tools of a Six Sigma project.
+
+| Group | Tools |
+| --- | --- |
+| Control charts | I-MR, Xbar-R, Xbar-S, P, NP, C, U, with tests for special causes |
+| Capability and measurement | Process capability (Cp, Cpk, Pp, Ppk, Cpm, expected PPM), crossed gage R&R (ANOVA method), DPMO and sigma level |
+| Prioritise | Pareto chart |
+| Design of experiments | Create and analyze two-level full factorial designs (effects, Pareto of effects, main-effect and interaction plots) |
+| Planning | Power and sample size for t tests |
+
+**Process** — analysis of how the work actually flows.
+
+- **Process mining** reads an event log (case ID, activity, timestamp, optionally an end timestamp and a resource) and produces a process map, lead-time statistics, the longest hand-overs, the common paths, a ranked list of improvement opportunities (queues, rework loops, non-standard paths, hand-offs, slow-case tail) and a screening score for automation candidates.
+- **Value stream analysis** takes a table of steps and gives lead time, process cycle efficiency, rolled throughput yield, takt time and the bottleneck.
+- **OEE** breaks equipment effectiveness into availability, performance and quality.
+
+The automation score is a heuristic for shortlisting, not a verdict: it rewards high volume, consistent duration, a predictable next step and a large share of the work.
+
+**Project (DMAIC)** — a workspace for the project documents, organised by phase, with a tollgate checklist per phase and shortcuts to the analyses each phase needs: project charter, SIPOC, voice of the customer to CTQ, stakeholder analysis, data collection plan, fishbone diagram, 5 Whys, root-cause verification log, impact / effort matrix, FMEA, automation opportunities, pilot plan, control plan, benefits tracking and lessons learned. Projects are saved in the browser, can be exported and imported as a file, and print as a single report.
+
+Not included: fractional factorial and response-surface designs, attribute agreement analysis, non-normal capability, multi-vari charts, EWMA and CUSUM charts, and a drawn value stream map.
+
 ## Layout
+
+- `js/quality.js` — control charts, capability, gage R&R and power calculations
+- `js/process.js` — event-log mining, automation scoring and value-stream arithmetic
+- `js/lss.js` — the Quality and Process dialogs and their output
+- `js/project.js` — the DMAIC project workspace
 
 - `js/stats.js` — the statistical routines, as pure functions over number arrays
 - `js/ml.js` — the machine-learning models, validation and metrics

@@ -204,6 +204,55 @@ const Sheet = (function () {
     load(Object.keys(out).map(k => ({ name: k, data: out[k] })));
   }
 
+  const lcg = seed => {
+    const u = () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
+    return { u, z: () => Math.sqrt(-2 * Math.log(u() + 1e-12)) * Math.cos(2 * Math.PI * u()) };
+  };
+
+  // Synthetic data for the quality tools: subgrouped diameters (with a shift late on), a crossed
+  // gage study, defect counts for a Pareto chart and daily inspection results for a P chart.
+  function sampleQuality() {
+    const { u, z } = lcg(551);
+    const sub = [], dia = [], part = [], oper = [], meas = [], day = [], insp = [], bad = [];
+    for (let s = 1; s <= 25; s++) for (let k = 0; k < 5; k++) { sub.push(s); dia.push((10 + (s >= 19 && s <= 22 ? 0.035 : 0) + 0.02 * z()).toFixed(3)); }
+    const pv = Array.from({ length: 10 }, () => 1.1 * z()), ov = { Ana: -0.12, Bo: 0.02, Cy: 0.14 };
+    for (let rep = 0; rep < 2; rep++) for (const o of Object.keys(ov)) for (let p = 0; p < 10; p++) { part.push(p + 1); oper.push(o); meas.push((25 + pv[p] + ov[o] + 0.18 * z()).toFixed(2)); }
+    for (let d = 1; d <= 25; d++) { const n = 180 + Math.floor(u() * 60); let c = 0; for (let i = 0; i < n; i++) if (u() < (d === 17 ? 0.11 : 0.04)) c++; day.push(d); insp.push(n); bad.push(c); }
+    load([{ name: 'Subgroup', data: sub }, { name: 'Diameter', data: dia }, { name: 'Part', data: part }, { name: 'Operator', data: oper }, { name: 'Measurement', data: meas },
+      { name: 'Defect', data: ['Scratch', 'Wrong label', 'Dent', 'Missing part', 'Misaligned', 'Contamination', 'Other'] }, { name: 'Count', data: [126, 71, 38, 19, 12, 9, 6] },
+      { name: 'Day', data: day }, { name: 'Inspected', data: insp }, { name: 'Defectives', data: bad }]);
+  }
+
+  // Synthetic invoice-approval event log (one row per activity) plus a small value-stream table.
+  // Built in: a long approval queue, mismatch and correction rework loops, and an extra sign-off on some invoices.
+  function sampleProcess() {
+    const { u, z } = lcg(9042), rows = [], base = new Date(2026, 0, 5, 8, 0).getTime(), p2 = n => String(n).padStart(2, '0');
+    const stamp = h => { const d = new Date(base + h * 3.6e6); return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
+    const pos = (m, s) => Math.max(m * 0.15, m + s * z()), pick = a => a[Math.floor(u() * a.length)];
+    const clerks = ['Aoife', 'Ben', 'Chloe'], managers = ['Dara', 'Emer'];
+    let arrival = 0;
+    for (let i = 1; i <= 150; i++) {
+      arrival += -1.1 * Math.log(1 - u());
+      let t = arrival;
+      const id = 'INV-' + String(i).padStart(4, '0'), clerk = pick(clerks), mgr = pick(managers);
+      const step = (act, wait, dur, res) => { t += wait; rows.push([id, act, stamp(t), stamp(t + dur), res]); t += dur; };
+      const enter = () => step('Enter data', pos(2.5, 1.5), pos(0.11, 0.04), clerk), match = () => step('Match to PO', pos(1, 0.6), pos(0.07, 0.015), clerk);
+      const approve = () => step('Approve', pos(18, 9), pos(0.04, 0.01), mgr);
+      step('Receive invoice', 0, 1 / 60, 'System'); enter(); match();
+      if (u() < 0.22) { step('Resolve mismatch', pos(6, 3), pos(0.35, 0.18), pick(clerks)); match(); }
+      approve();
+      if (u() < 0.12) { step('Request correction', 0.05, pos(0.06, 0.02), mgr); enter(); match(); approve(); }
+      if (u() < 0.15) step('Second approval', pos(26, 10), pos(0.05, 0.02), 'Finance director');
+      step('Schedule payment', pos(2, 1), pos(0.05, 0.004), clerk);
+      step('Pay', pos(8, 2), 1 / 60, 'System');
+    }
+    const colOf = j => rows.map(r => r[j]);
+    load([{ name: 'Case', data: colOf(0) }, { name: 'Activity', data: colOf(1) }, { name: 'Start', data: colOf(2) }, { name: 'End', data: colOf(3) }, { name: 'Resource', data: colOf(4) },
+      { name: '', data: [] },
+      { name: 'Step', data: ['Receive', 'Enter data', 'Match to PO', 'Approve', 'Schedule payment', 'Pay'] }, { name: 'CycleMin', data: [1, 7, 4, 2, 3, 1] },
+      { name: 'WaitMin', data: [0, 150, 60, 1080, 120, 480] }, { name: 'ValueAdd', data: ['N', 'Y', 'N', 'N', 'N', 'Y'] }, { name: 'YieldPct', data: [100, 88, 78, 95, 99, 100] }]);
+  }
+
   // Append new columns after the last used one. Each data array is indexed by worksheet row.
   function addColumns(list) {
     const start = used().length ? Math.max(...used()) + 1 : 0;
@@ -219,5 +268,5 @@ const Sheet = (function () {
     save();
   }
 
-  return { init, render, load, importText, toCsv, sample, sampleML, addColumns, clear: () => load([]), used, isNumeric, label, id, num, raw, esc };
+  return { init, render, load, importText, toCsv, sample, sampleML, sampleQuality, sampleProcess, addColumns, clear: () => load([]), used, isNumeric, label, id, num, raw, esc };
 })();

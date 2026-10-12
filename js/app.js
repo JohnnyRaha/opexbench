@@ -25,7 +25,19 @@
         const html = '<table><thead><tr>' + t.head.map((h, j) => `<th${cls(j)}>${esc(h)}</th>`).join('') + '</tr></thead><tbody>'
           + t.rows.map(r => '<tr>' + r.map((c, j) => `<td${cls(j)}>${esc(c)}</td>`).join('') + '</tr>').join('') + '</tbody></table>';
         card.append(el('div', { className: 'tbl-wrap' }, html));
-      } else if (b.html) card.append(el('div', { className: 'html-block' }, b.html));
+      } else if (b.html) {
+        const block = el('div', { className: 'html-block' }, b.html), svg = block.querySelector('svg');
+        card.append(block);
+        if (svg) {
+          const save = el('button', { type: 'button', className: 'save-svg', textContent: 'Save diagram (SVG)' });
+          save.onclick = () => {
+            const a = el('a', { href: URL.createObjectURL(new Blob([svg.outerHTML], { type: 'image/svg+xml' })), download: title.replace(/[^\w-]+/g, '_') + '.svg' });
+            a.click();
+            URL.revokeObjectURL(a.href);
+          };
+          block.after(save);
+        }
+      }
       else if (b.plot) {
         const div = el('div', { className: 'plot' });
         card.append(div);
@@ -180,7 +192,7 @@
     $('analysis-view').hidden = view === 'project';
     $('menus').style.visibility = view === 'project' ? 'hidden' : '';
     document.querySelectorAll('#view-switch button').forEach(b => b.classList.toggle('on', b.dataset.view === view));
-    try { localStorage.setItem('statslab.view', view); } catch (e) { /* storage unavailable */ }
+    try { localStorage.setItem('opexbench.view', view); } catch (e) { /* storage unavailable */ }
     if (view === 'project') Project.render(); else window.dispatchEvent(new Event('resize'));
   }
 
@@ -189,7 +201,7 @@
     Project.init();
     document.querySelectorAll('#view-switch button').forEach(b => { b.onclick = () => setView(b.dataset.view); });
     let view = 'analysis';
-    try { view = localStorage.getItem('statslab.view') || view; } catch (e) { /* ignore */ }
+    try { view = localStorage.getItem('opexbench.view') || view; } catch (e) { /* ignore */ }
     setView(view);
     $('welcome-process').onclick = () => { if (confirmReplace()) Sheet.sampleProcess(); };
     buildMenus();
@@ -204,5 +216,5 @@
     });
   });
 
-  window.StatsLab = { addOutput, openDialog, setView };
+  window.OpExBench = { addOutput, openDialog, setView };
 })();

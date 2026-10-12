@@ -1,6 +1,6 @@
-# StatsLab
+# OpExBench
 
-Statistical tests, graphs and machine learning in the browser: a worksheet, Stat, Graph and Machine Learning menus, and a session window for results. No install and no server-side code; everything runs on the page.
+A Lean Six Sigma workbench in the browser. It combines a DMAIC project workspace, value stream mapping and process mining, the quality tools (control charts, capability, gage R&R, DOE), and the statistics, graphs and machine learning to back them up. No install and no server-side code; everything runs on the page.
 
 ## Run it
 
@@ -52,14 +52,14 @@ Predictors can be numeric or text (text columns become indicator variables). Tre
 **Process** — analysis of how the work actually flows.
 
 - **Process mining** reads an event log (case ID, activity, timestamp, optionally an end timestamp and a resource) and produces a process map, lead-time statistics, the longest hand-overs, the common paths, a ranked list of improvement opportunities (queues, rework loops, non-standard paths, hand-offs, slow-case tail) and a screening score for automation candidates.
-- **Value stream analysis** takes a table of steps and gives lead time, process cycle efficiency, rolled throughput yield, takt time and the bottleneck.
+- **Value stream map** takes a table of steps (cycle time, wait, value-adding flag, yield, and optionally people, changeover and uptime) and draws the map: supplier, customer and information flow, process and data boxes, queues, the lead-time ladder and kaizen bursts on the biggest problems. It also reports lead time, process cycle efficiency, rolled throughput yield, takt time and the bottleneck. Diagrams can be saved as SVG.
 - **OEE** breaks equipment effectiveness into availability, performance and quality.
 
 The automation score is a heuristic for shortlisting, not a verdict: it rewards high volume, consistent duration, a predictable next step and a large share of the work.
 
 **Project (DMAIC)** — a workspace for the project documents, organised by phase, with a tollgate checklist per phase and shortcuts to the analyses each phase needs: project charter, SIPOC, voice of the customer to CTQ, stakeholder analysis, data collection plan, fishbone diagram, 5 Whys, root-cause verification log, impact / effort matrix, FMEA, automation opportunities, pilot plan, control plan, benefits tracking and lessons learned. Projects are saved in the browser, can be exported and imported as a file, and print as a single report.
 
-Not included: fractional factorial and response-surface designs, attribute agreement analysis, non-normal capability, multi-vari charts, EWMA and CUSUM charts, and a drawn value stream map.
+Not included: fractional factorial and response-surface designs, attribute agreement analysis, non-normal capability, multi-vari charts, and EWMA and CUSUM charts. The value stream map is generated from the step table rather than drawn by hand, and shows one current-state map at a time.
 
 ## Layout
 

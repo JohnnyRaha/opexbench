@@ -1,7 +1,7 @@
 // Worksheet: column-oriented data model plus the editable grid.
 const Sheet = (function () {
   'use strict';
-  const MIN_ROWS = 60, MIN_COLS = 16, STORE = 'statslab.sheet';
+  const MIN_ROWS = 60, MIN_COLS = 16, STORE = 'opexbench.sheet';
   let cols = [];      // [{ name, data: [string] }]
   let nRows = MIN_ROWS;
   const grid = () => document.getElementById('grid');
@@ -250,7 +250,7 @@ const Sheet = (function () {
     load([{ name: 'Case', data: colOf(0) }, { name: 'Activity', data: colOf(1) }, { name: 'Start', data: colOf(2) }, { name: 'End', data: colOf(3) }, { name: 'Resource', data: colOf(4) },
       { name: '', data: [] },
       { name: 'Step', data: ['Receive', 'Enter data', 'Match to PO', 'Approve', 'Schedule payment', 'Pay'] }, { name: 'CycleMin', data: [1, 7, 4, 2, 3, 1] },
-      { name: 'WaitMin', data: [0, 150, 60, 1080, 120, 480] }, { name: 'ValueAdd', data: ['N', 'Y', 'N', 'N', 'N', 'Y'] }, { name: 'YieldPct', data: [100, 88, 78, 95, 99, 100] }]);
+      { name: 'WaitMin', data: [0, 150, 60, 1080, 120, 480] }, { name: 'ValueAdd', data: ['N', 'Y', 'N', 'N', 'N', 'Y'] }, { name: 'YieldPct', data: [100, 88, 78, 95, 99, 100] }, { name: 'People', data: [0, 3, 3, 2, 1, 0] }]);
   }
 
   // Append new columns after the last used one. Each data array is indexed by worksheet row.

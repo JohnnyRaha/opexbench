@@ -202,3 +202,8 @@ svg.fishbone { display: block; width: 100%; max-width: 960px; }
   #menubar, #project-side, #analysis-view, .report-head button { display: none !important; }
   #project-view, #project-main { display: block; overflow: visible; padding: 0; }
 }
+
+.result:has(svg.vsm) { max-width: none; }
+svg.vsm { display: block; width: 100%; border: 1px solid var(--line); border-radius: 4px; }
+.html-block { overflow-x: auto; }
+.save-svg { margin: 8px 0 0; padding: 4px 12px; border: 1px solid var(--line); border-radius: 5px; background: #fff; cursor: pointer; font-size: 13px; }

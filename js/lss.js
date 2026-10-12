@@ -5,7 +5,7 @@
   const { M, S, g, f2, pf, pct, H, P, Note, T, Plot, need, vals, natural, COLORS, axis, layout, alt, binning, tally, Html } = Analyses.kit;
   const A = Analyses.all, Q = MQual, PR = MProc;
   const RED = '#d1495b', GREEN = '#2e8b57';
-  const whole = x => Number.isInteger(x) ? String(x) : g(x);
+  const whole = x => Number.isInteger(x) ? String(x) : String(+x.toPrecision(4));
   const numField = (key, label, extra) => Object.assign({ key, type: 'num', label }, extra);
 
   // ---------- subgroups ----------
@@ -378,7 +378,8 @@
         + `<text x="${cx}" y="${y(i) + 17}" text-anchor="middle" class="pm-name">${esc(nm)}</text><text x="${cx}" y="${y(i) + 32}" text-anchor="middle" class="pm-sub">${a.events} events</text>`;
     }).join('');
     const defs = [COLORS[0], RED, '#64748b'].map(c => `<marker id="arr-${c.slice(1)}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 z" fill="${c}"/></marker>`).join('');
-    return `<svg class="pm" viewBox="0 0 ${W} ${endY + 22}" xmlns="http://www.w3.org/2000/svg"><defs>${defs}</defs>${parts.join('')}`
+    const css = '<style>.pm-name{font:600 13px Segoe UI,Arial,sans-serif;fill:#1d2430}.pm-sub{font:11px Segoe UI,Arial,sans-serif;fill:#556}.pm-edge{font:600 11px Segoe UI,Arial,sans-serif;paint-order:stroke;stroke:#fff;stroke-width:3px}</style>';
+    return `<svg class="pm" viewBox="0 0 ${W} ${endY + 22}" xmlns="http://www.w3.org/2000/svg">${css}<defs>${defs}</defs>${parts.join('')}`
       + `<circle cx="${cx}" cy="22" r="12" fill="${GREEN}"/><circle cx="${cx}" cy="${endY}" r="12" fill="#333"/><circle cx="${cx}" cy="${endY}" r="6" fill="#fff"/>${nodes}${labels.join('')}</svg>`
       + `<p class="note">Arrow labels: number of times the path was taken · mean time between the two steps. Blue goes to the next step, grey skips ahead, red loops back. Paths used by fewer than ${minShare}% of cases are hidden.</p>`;
   }
@@ -446,23 +447,88 @@
   };
 
   // ---------- value stream ----------
+  // Draws the value stream map: supplier, process control and customer on top with information
+  // flow between them; process boxes with data boxes; queues between steps; the lead-time ladder
+  // underneath; and kaizen bursts on the biggest problems. All styling is inline so the SVG can be saved.
+  function vsmMap(steps, r, v) {
+    const esc = S.esc, n = steps.length, u = ' ' + v.unit, bw = 144, gap = 90, mx = 28, W = Math.max(860, mx * 2 + n * (gap + bw)), py = 196, bh = 40;
+    const cut = (s, k) => s.length > k ? s.slice(0, k - 1) + '…' : s, x = i => mx + gap + i * (gap + bw);
+    const info = s => [['C/T', whole(s.ct) + u]].concat(s.co != null ? [['C/O', whole(s.co) + u]] : [], s.up != null ? [['Uptime', pct(s.up)]] : [],
+      [['Yield', pct(s.yield)]], s.ops != null ? [['People', whole(s.ops)]] : [], [['Value-adding', s.va ? 'Yes' : 'No']]);
+    const rows = info(steps[0]).length, dataH = 18 * rows + 8, yH = py + bh + dataH + 54, yL = yH + 24, H = yL + 122;
+    const text = (tx, ty, t, o) => `<text x="${tx}" y="${ty}" text-anchor="${(o && o.a) || 'middle'}" font-size="${(o && o.s) || 12}" font-weight="${(o && o.w) || 400}" fill="${(o && o.f) || '#1d2430'}">${esc(String(t))}</text>`;
+    const factory = (fx, name, lines) => `<path d="M${fx},92 V46 l30,-16 v16 l30,-16 v16 l30,-16 v16 h40 V92 z" fill="#eef4fa" stroke="${COLORS[0]}" stroke-width="1.5"/>`
+      + text(fx + 65, 66, cut(name, 18), { w: 600 }) + lines.map((l, k) => text(fx + 65, 81 + 12 * k, l, { s: 10.5, f: '#445' })).join('');
+    const burst = (cx, cy, label) => {
+      let pts = '';
+      for (let k = 0; k < 20; k++) { const a = Math.PI * k / 10, rad = k % 2 ? 19 : 29; pts += `${(cx + rad * Math.cos(a)).toFixed(1)},${(cy + rad * Math.sin(a)).toFixed(1)} `; }
+      return `<polygon points="${pts}" fill="#ffe08a" stroke="#c77700" stroke-width="1.2"/>` + text(cx, cy + 4, label, { s: 10.5, w: 600, f: '#7a4a00' });
+    };
+    const cxTop = W / 2, last = x(n - 1) + bw;
+    let s = `<defs><marker id="vsm-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker>`
+      + `<marker id="vsm-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="16" markerHeight="16" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 z" fill="#64748b"/></marker></defs>`;
+    // top row and information flow
+    s += factory(mx, v.supplier || 'Supplier', []) + factory(W - mx - 130, v.customer || 'Customer', v.demand ? [`Demand ${whole(v.demand)} / day`] : [])
+      + `<rect x="${cxTop - 80}" y="34" width="160" height="50" rx="4" fill="#fff" stroke="#333" stroke-width="1.5"/>` + text(cxTop, 56, 'Process control', { w: 600 })
+      + text(cxTop, 73, isFinite(r.takt) ? `Takt time ${whole(+r.takt.toFixed(2))}${u}` : 'Scheduling and information', { s: 10.5, f: '#445' })
+      + `<line x1="${W - mx - 130}" y1="58" x2="${cxTop + 84}" y2="58" stroke="#333" marker-end="url(#vsm-a)"/><line x1="${cxTop - 80}" y1="58" x2="${mx + 134}" y2="58" stroke="#333" marker-end="url(#vsm-a)"/>`
+      + text((W - mx - 130 + cxTop + 84) / 2, 51, 'Orders', { s: 10.5, f: '#445' }) + text((cxTop - 80 + mx + 134) / 2, 51, 'Orders', { s: 10.5, f: '#445' });
+    // material flow in from the supplier and out to the customer
+    s += `<path d="M${mx + 40},92 V${py + bh / 2} H${x(0) - 4}" fill="none" stroke="#64748b" stroke-width="5" marker-end="url(#vsm-b)"/>`
+      + `<path d="M${last},${py + bh / 2} H${W - mx - 40} V96" fill="none" stroke="#64748b" stroke-width="5" marker-end="url(#vsm-b)"/>`;
+    const maxWait = Math.max(...steps.map(t => t.wait)), minYield = Math.min(...steps.map(t => t.yield)), maxCt = Math.max(...steps.map(t => t.ct));
+    let ladder = `M${mx},${yH}`;
+    steps.forEach((t, i) => {
+      const bx = x(i), qx = bx - gap / 2, color = t.va ? GREEN : '#c77700';
+      if (i > 0) s += `<line x1="${x(i - 1) + bw}" y1="${py + bh / 2}" x2="${bx - 4}" y2="${py + bh / 2}" stroke="#64748b" stroke-width="5" stroke-dasharray="9 5" marker-end="url(#vsm-b)"/>`;
+      if (t.wait > 0) s += `<polygon points="${qx},${py - 34} ${qx - 19},${py - 2} ${qx + 19},${py - 2}" fill="#fff7d6" stroke="#b8860b" stroke-width="1.5"/>` + text(qx, py - 9, 'I', { w: 600, f: '#7a5a00' });
+      s += `<rect x="${bx}" y="${py}" width="${bw}" height="${bh}" fill="${t.va ? '#e6f4ec' : '#fdf1dc'}" stroke="${color}" stroke-width="2"/>` + text(bx + bw / 2, py + 25, cut(t.name, 20), { s: 13, w: 600 })
+        + `<rect x="${bx}" y="${py + bh}" width="${bw}" height="${dataH}" fill="#fff" stroke="${color}" stroke-width="1.2"/>`
+        + info(t).map(([k, val], j) => text(bx + 8, py + bh + 18 + 18 * j, k, { a: 'start', s: 11, f: '#556' }) + text(bx + bw - 8, py + bh + 18 + 18 * j, val, { a: 'end', s: 11, w: 600 })).join('');
+      // lead-time ladder: waiting on the upper level, work on the lower
+      ladder += ` H${bx} V${yL} H${bx + bw} V${yH}`;
+      s += text(qx, yH - 7, whole(t.wait) + u, { s: 11, f: RED, w: 600 }) + text(bx + bw / 2, yL + 16, whole(t.ct) + u, { s: 11, f: t.va ? GREEN : '#c77700', w: 600 });
+      // kaizen bursts on the largest queue, the lowest yield and the pacing step
+      let k = 0;
+      if (t.wait === maxWait && maxWait > 0) s += burst(qx, py - 64, 'Queue');
+      if (t.yield === minYield && minYield < 1) s += burst(bx + bw - 26 - 60 * k++, py - 30, 'Yield');
+      if (isFinite(r.takt) ? t.ct > r.takt : t.ct === maxCt) s += burst(bx + bw - 26 - 60 * k++, py - 30, isFinite(r.takt) ? 'Takt' : 'Slowest');
+    });
+    s += `<path d="${ladder} H${W - mx}" fill="none" stroke="#333" stroke-width="1.5"/>`
+      + text(mx, yH - 24, 'Waiting', { a: 'start', s: 10.5, f: RED }) + text(mx, yL + 16, 'Work', { a: 'start', s: 10.5, f: '#445' });
+    const sx = W - mx - 250, sy = yL + 36;
+    s += `<rect x="${sx}" y="${sy}" width="250" height="68" fill="#f6f8fa" stroke="#333"/>`
+      + [['Lead time', whole(r.lead) + u], ['Value-adding time', whole(r.va) + u], ['Process cycle efficiency', pct(r.pce)]].map(([k, val], j) =>
+        text(sx + 10, sy + 20 + 19 * j, k, { a: 'start', s: 12 }) + text(sx + 240, sy + 20 + 19 * j, val, { a: 'end', s: 12, w: 600 })).join('');
+    return `<svg class="vsm" style="min-width:${Math.round(W * 0.85)}px" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif"><rect width="${W}" height="${H}" fill="#fff"/>${s}</svg>`
+      + '<p class="note">Green boxes add value for the customer; amber boxes do not. Triangles are queues (work waiting) before a step. The stepped line is the lead-time ladder. Starbursts mark where to focus improvement.</p>';
+  }
+
   A.vsm = {
-    title: 'Value Stream Analysis',
+    title: 'Value Stream Map',
     fields: [{ key: 'step', type: 'col', label: 'Process step names' }, { key: 'ct', type: 'col', numeric: true, label: 'Cycle (work) time per step' },
       { key: 'wait', type: 'col', numeric: true, optional: true, label: 'Wait time before each step (optional)' },
       { key: 'va', type: 'col', optional: true, label: 'Value-adding? column of Y / N (optional)' },
       { key: 'yld', type: 'col', numeric: true, optional: true, label: 'First-pass yield per step, % or fraction (optional)' },
+      { key: 'ops', type: 'col', numeric: true, optional: true, label: 'People per step (optional)' },
+      { key: 'co', type: 'col', numeric: true, optional: true, label: 'Changeover time per step (optional)' },
+      { key: 'up', type: 'col', numeric: true, optional: true, label: 'Uptime per step, % or fraction (optional)' },
       { key: 'unit', type: 'text', label: 'Time unit', def: 'min' },
+      { key: 'supplier', type: 'text', optional: true, label: 'Supplier name', def: 'Supplier' }, { key: 'customer', type: 'text', optional: true, label: 'Customer name', def: 'Customer' },
       numField('available', 'Available working time per day, same unit (optional)', { optional: true, min: 0 }), numField('demand', 'Customer demand per day (optional)', { optional: true, min: 0 })],
     run(v) {
       const nm = S.raw(v.step), ct = S.num(v.ct), w = v.wait != null ? S.num(v.wait) : [], va = v.va != null ? S.raw(v.va) : null, yl = v.yld != null ? S.num(v.yld) : [];
+      const opt = key => v[key] != null ? S.num(v[key]) : null, ops = opt('ops'), co = opt('co'), up = opt('up'), frac = x => x > 1 ? x / 100 : x;
       const steps = [];
-      nm.forEach((s, i) => { if (s && isFinite(ct[i])) steps.push({ name: s, ct: ct[i], wait: isFinite(w[i]) ? w[i] : 0, va: va ? /^(y|v|t|1)/i.test(va[i] || '') : true, yield: isFinite(yl[i]) ? (yl[i] > 1 ? yl[i] / 100 : yl[i]) : 1 }); });
+      nm.forEach((s, i) => { if (s && isFinite(ct[i])) steps.push({ name: s, ct: ct[i], wait: isFinite(w[i]) ? w[i] : 0, va: va ? /^(y|v|t|1)/i.test(va[i] || '') : true, yield: isFinite(yl[i]) ? frac(yl[i]) : 1,
+        ops: ops ? (isFinite(ops[i]) ? ops[i] : 0) : null, co: co ? (isFinite(co[i]) ? co[i] : 0) : null, up: up ? (isFinite(up[i]) ? frac(up[i]) : 1) : null }); });
       need(steps.length >= 2, 'At least two steps with a cycle time are needed.');
+      need(steps.length <= 14, 'The map handles up to 14 steps; combine minor steps first.');
       const r = PR.valueStream(steps, { available: v.available, demand: v.demand }), u = ' ' + v.unit, names = steps.map(s => s.name);
-      const out = [T(['Step', 'Cycle time', 'Wait before', 'Value-adding', 'First-pass yield'], steps.map(s => [s.name, whole(s.ct), whole(s.wait), s.va ? 'Yes' : 'No', pct(s.yield)])),
-        H('Summary'), T(['Lead time', 'Total cycle time', 'Total waiting', 'Value-adding time', 'Process cycle efficiency', 'Rolled throughput yield'].concat(isFinite(r.takt) ? ['Takt time'] : []),
-          [[whole(r.lead) + u, whole(r.ct) + u, whole(r.wait) + u, whole(r.va) + u, pct(r.pce), pct(r.rty)].concat(isFinite(r.takt) ? [whole(r.takt) + u] : [])], 0),
+      const out = [Html(vsmMap(steps, r, v)),
+        H('Summary'), T(['Lead time', 'Total cycle time', 'Total waiting', 'Value-adding time', 'Process cycle efficiency', 'Rolled throughput yield'].concat(isFinite(r.takt) ? ['Takt time'] : [], ops ? ['People'] : []),
+          [[whole(r.lead) + u, whole(r.ct) + u, whole(r.wait) + u, whole(r.va) + u, pct(r.pce), pct(r.rty)].concat(isFinite(r.takt) ? [whole(+r.takt.toFixed(2)) + u] : [], ops ? [whole(M.sum(steps.map(s => s.ops)))] : [])], 0),
+        H('Steps'), T(['Step', 'Cycle time', 'Wait before', 'Value-adding', 'First-pass yield'], steps.map(s => [s.name, whole(s.ct), whole(s.wait), s.va ? 'Yes' : 'No', pct(s.yield)])),
         Plot([{ type: 'bar', name: 'Waiting', x: names, y: steps.map(s => s.wait), marker: { color: RED } },
           { type: 'bar', name: 'Value-adding work', x: names, y: steps.map(s => s.va ? s.ct : 0), marker: { color: GREEN } },
           { type: 'bar', name: 'Non-value-adding work', x: names, y: steps.map(s => s.va ? 0 : s.ct), marker: { color: COLORS[3] } }],

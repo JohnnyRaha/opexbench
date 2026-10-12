@@ -2,7 +2,7 @@
 // Each tool is declared as a schema (form fields and/or table columns) and rendered generically.
 const Project = (function () {
   'use strict';
-  const esc = Sheet.esc, $ = id => document.getElementById(id), STORE = 'statslab.project';
+  const esc = Sheet.esc, $ = id => document.getElementById(id), STORE = 'opexbench.project';
   const num = v => v === '' || v == null || !isFinite(+v) ? NaN : +v;
   const C = { blue: '#1f6fb2', red: '#d1495b', green: '#2e8b57', amber: '#e8a33d' };
 
@@ -211,7 +211,7 @@ const Project = (function () {
       const b = e.target.closest('button');
       if (!b) return;
       if (b.dataset.go) { current = b.dataset.go; render(); }
-      else if (b.dataset.an) { StatsLab.setView('analysis'); StatsLab.openDialog(Analyses.all[b.dataset.an]); }
+      else if (b.dataset.an) { OpExBench.setView('analysis'); OpExBench.openDialog(Analyses.all[b.dataset.an]); }
       else if (b.dataset.act === 'add') { data(current.slice(5)).rows.push({}); render(); }
       else if (b.dataset.act === 'del') { const d = data(current.slice(5)); d.rows.splice(+b.dataset.i, 1); if (!d.rows.length) d.rows.push({}); save(); render(); }
       else if (b.dataset.act === 'print') window.print();
@@ -243,7 +243,7 @@ const Project = (function () {
       if (!f) return;
       f.text().then(t => {
         try { const s = JSON.parse(t); if (!s || typeof s.tools !== 'object') throw 0; state = Object.assign({ name: '', tools: {}, gate: {} }, s); save(); current = 'phase:define'; render(); }
-        catch (err) { alert('That file is not a StatsLab project.'); }
+        catch (err) { alert('That file is not a OpExBench project.'); }
       });
       e.target.value = '';
     });

@@ -128,7 +128,8 @@
       a.click();
       URL.revokeObjectURL(a.href);
     }],
-    ['Load sample data', () => { if (confirmReplace()) Sheet.sample(); }],
+    ['Load sample data: bottling line', () => { if (confirmReplace()) Sheet.sample(); }],
+    ['Load sample data: coffee lots (machine learning)', () => { if (confirmReplace()) Sheet.sampleML(); }],
     ['Clear worksheet', () => { if (confirmReplace()) Sheet.clear(); }]
   ];
   const confirmReplace = () => !Sheet.used().length || confirm('Replace the current worksheet?');
@@ -181,5 +182,5 @@
     });
   });
 
-  window.StatBench = { addOutput, openDialog };
+  window.StatsLab = { addOutput, openDialog };
 })();

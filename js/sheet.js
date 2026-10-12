@@ -1,7 +1,7 @@
 // Worksheet: column-oriented data model plus the editable grid.
 const Sheet = (function () {
   'use strict';
-  const MIN_ROWS = 60, MIN_COLS = 16, STORE = 'statbench.sheet';
+  const MIN_ROWS = 60, MIN_COLS = 16, STORE = 'statslab.sheet';
   let cols = [];      // [{ name, data: [string] }]
   let nRows = MIN_ROWS;
   const grid = () => document.getElementById('grid');
@@ -179,5 +179,45 @@ const Sheet = (function () {
     load(Object.keys(out).map(k => ({ name: k, data: out[k] })));
   }
 
-  return { init, render, load, importText, toCsv, sample, clear: () => load([]), used, isNumeric, label, id, num, raw, esc };
+  // Synthetic coffee-lot data for the machine-learning tools: Grade is a class label and
+  // Price a numeric target, both driven (non-linearly) by the measurements. A few rows have
+  // no Grade or Price so they can be scored as new observations.
+  function sampleML() {
+    let seed = 73110;
+    const u = () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
+    const z = () => Math.sqrt(-2 * Math.log(u() + 1e-12)) * Math.cos(2 * Math.PI * u());
+    const regions = ['Highland', 'Valley', 'Coast'], bonus = { Highland: 0.8, Valley: 0, Coast: -0.5 };
+    const out = { Region: [], Altitude: [], Moisture: [], Acidity: [], Density: [], Defects: [], Grade: [], Price: [] };
+    for (let i = 0; i < 186; i++) {
+      const reg = regions[Math.floor(u() * 3)];
+      const alt = 1400 + (reg === 'Highland' ? 350 : reg === 'Coast' ? -300 : 0) + 180 * z();
+      const moist = 11 + 0.9 * z(), acid = 5 + 0.0012 * (alt - 1400) + 0.5 * z(), dens = 690 + 0.03 * (alt - 1400) + 14 * z();
+      const defects = Math.max(0, Math.round(6 - 0.004 * (alt - 1400) + 2.5 * z()));
+      const score = 1.6 * (acid - 5) + 0.05 * (dens - 690) - 0.35 * defects - 0.9 * Math.abs(moist - 11) + bonus[reg] + 0.6 * z();
+      const price = 4.2 + 0.55 * score + 0.05 * score * score + 0.25 * z();
+      const known = i < 180;
+      out.Region.push(reg); out.Altitude.push(alt.toFixed(0)); out.Moisture.push(moist.toFixed(1)); out.Acidity.push(acid.toFixed(2));
+      out.Density.push(dens.toFixed(0)); out.Defects.push(String(defects));
+      out.Grade.push(known ? (score > -0.9 ? 'Specialty' : score > -2.6 ? 'Premium' : 'Commercial') : '');
+      out.Price.push(known ? price.toFixed(2) : '');
+    }
+    load(Object.keys(out).map(k => ({ name: k, data: out[k] })));
+  }
+
+  // Append new columns after the last used one. Each data array is indexed by worksheet row.
+  function addColumns(list) {
+    const start = used().length ? Math.max(...used()) + 1 : 0;
+    ensure(Math.max(...list.map(c => c.data.length)) + 5, start + list.length);
+    const taken = new Set(cols.map(c => c.name.trim()));
+    list.forEach((c, k) => {
+      let name = c.name;
+      for (let n = 2; taken.has(name); n++) name = c.name + '_' + n;
+      taken.add(name);
+      cols[start + k] = { name, data: Array.from(c.data, v => v == null ? '' : String(v)) };
+    });
+    render();
+    save();
+  }
+
+  return { init, render, load, importText, toCsv, sample, sampleML, addColumns, clear: () => load([]), used, isNumeric, label, id, num, raw, esc };
 })();

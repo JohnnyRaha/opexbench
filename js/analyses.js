@@ -691,6 +691,160 @@ const Analyses = (function () {
     }
   };
 
+  // ---------- machine learning ----------
+  const ML = MML;
+  const MODEL_NAMES = {
+    logistic: 'Logistic regression', linear: 'Linear regression', knn: 'k-nearest neighbors',
+    tree: 'Decision tree', forest: 'Random forest', nb: 'Naive Bayes (Gaussian)'
+  };
+  const isModel = (...m) => v => m.includes(v.model);
+
+  // Numeric predictors are used as they are; text predictors become 0/1 indicator columns
+  // (first level is the reference). Rows with any missing predictor are dropped.
+  function design(xs) {
+    const n = Math.max(...xs.map(i => S.raw(i).length)), names = [], get = [];
+    xs.forEach(i => {
+      if (S.isNumeric(i)) { const d = S.num(i); names.push(S.label(i)); get.push(r => r < d.length ? d[r] : NaN); return; }
+      const d = S.raw(i), levels = [...new Set(d.filter(x => x !== ''))].sort(natural);
+      need(levels.length >= 2 && levels.length <= 20, `Text predictor "${S.label(i)}" must have between 2 and 20 distinct values.`);
+      levels.slice(1).forEach(l => { names.push(S.label(i) + ' = ' + l); get.push(r => !d[r] ? NaN : d[r] === l ? 1 : 0); });
+    });
+    const rows = [], X = [];
+    for (let r = 0; r < n; r++) { const row = get.map(f => f(r)); if (row.every(isFinite)) { rows.push(r); X.push(row); } }
+    return { names, rows, X };
+  }
+
+  function mlFields(task) {
+    const models = task === 'class' ? ['forest', 'tree', 'logistic', 'knn', 'nb'] : ['forest', 'tree', 'linear', 'knn'];
+    return [
+      task === 'class' ? { key: 'y', type: 'col', label: 'Response (class labels)' } : { key: 'y', type: 'col', numeric: true, label: 'Response (numeric)' },
+      { key: 'xs', type: 'cols', label: 'Predictors (numeric or text)' },
+      { key: 'model', type: 'select', label: 'Model', def: 'forest', options: models.map(m => [m, MODEL_NAMES[m]]) },
+      { key: 'trees', type: 'num', label: 'Number of trees', def: 100, min: 1, max: 1000, integer: true, showIf: isModel('forest') },
+      { key: 'depth', type: 'num', label: 'Maximum tree depth', def: 6, min: 1, max: 30, integer: true, showIf: isModel('forest', 'tree') },
+      { key: 'minLeaf', type: 'num', label: 'Minimum rows per leaf', def: 2, min: 1, integer: true, showIf: isModel('forest', 'tree') },
+      { key: 'k', type: 'num', label: 'Number of neighbors (k)', def: 5, min: 1, integer: true, showIf: isModel('knn') },
+      { key: 'lambda', type: 'num', label: 'L2 (ridge) penalty, 0 for none', def: 0, min: 0, showIf: isModel('logistic', 'linear') },
+      { key: 'validation', type: 'select', label: 'Validation', def: 'holdout', options: [['holdout', 'Hold out a test set'], ['cv', 'K-fold cross-validation']] },
+      { key: 'testPct', type: 'num', label: 'Test set size (%)', def: 30, min: 5, max: 80, showIf: v => v.validation === 'holdout' },
+      { key: 'folds', type: 'num', label: 'Number of folds', def: 5, min: 2, max: 20, integer: true, showIf: v => v.validation === 'cv' },
+      { key: 'seed', type: 'num', label: 'Random seed', def: 1, min: 0, integer: true },
+      { key: 'store', type: 'check', label: 'Store predictions in the worksheet' }
+    ];
+  }
+
+  // Shared set-up, fitting and bookkeeping for both ML dialogs.
+  function mlRun(v, task) {
+    need(!v.xs.includes(v.y), 'The response cannot also be a predictor.');
+    const d = design(v.xs);
+    need(d.rows.length, 'No rows have a value in every predictor.');
+    let classes = null, yAll;
+    if (task === 'class') {
+      const raw = S.raw(v.y);
+      classes = [...new Set(d.rows.map(r => raw[r] || '').filter(x => x !== ''))].sort(natural);
+      need(classes.length >= 2 && classes.length <= 20, `The response must have between 2 and 20 classes; it has ${classes.length}.`);
+      yAll = d.rows.map(r => raw[r] ? classes.indexOf(raw[r]) : -1);
+    } else {
+      const num = S.num(v.y);
+      yAll = d.rows.map(r => r < num.length && isFinite(num[r]) ? num[r] : NaN);
+    }
+    const lab = yAll.map((y, j) => j).filter(j => task === 'class' ? yAll[j] >= 0 : isFinite(yAll[j]));
+    const X = ML.pick(d.X, lab), y = ML.pick(yAll, lab), K = classes ? classes.length : 0;
+    need(X.length >= 10, 'At least 10 rows with a response and all predictors are needed.');
+    need(v.validation !== 'cv' || v.folds <= X.length, 'There are more folds than rows.');
+    const res = ML.evaluate(X, y, Object.assign({}, v, { K }));
+    const cv = v.validation === 'cv', unlabeled = d.rows.length - lab.length;
+    const hyper = {
+      forest: `${v.trees} trees, depth ≤ ${v.depth}, ≥ ${v.minLeaf} rows per leaf`,
+      tree: `depth ≤ ${v.depth}, ≥ ${v.minLeaf} rows per leaf, ${res.model.leaves} leaves`,
+      knn: `k = ${v.k}, standardized predictors`, logistic: `L2 penalty ${v.lambda}, standardized predictors`,
+      linear: `L2 penalty ${v.lambda}, standardized predictors`, nb: 'Gaussian likelihoods'
+    }[v.model];
+    const out = [
+      T(['', ''], [['Model', `${MODEL_NAMES[v.model]} (${hyper})`], ['Response', S.label(v.y) + (classes ? ': ' + classes.join(', ') : '')],
+        ['Predictors', v.xs.map(S.label).join(', ')], ['Rows used', `${X.length}` + (unlabeled ? ` (plus ${unlabeled} without a response)` : '')],
+        ['Validation', cv ? `${v.folds}-fold cross-validation, seed ${v.seed}` : `${res.train.idx.length} training rows, ${res.test.idx.length} test rows, seed ${v.seed}`]], 2)
+    ];
+    const fmt = x => task === 'class' ? classes[x] : String(Number(x.toPrecision(6)));
+    const finish = () => {
+      if (res.model.importance) {
+        const order = d.names.map((_, j) => j).sort((a, b) => res.model.importance[b] - res.model.importance[a]);
+        out.push(Plot([{
+          type: 'bar', orientation: 'h', y: order.map(j => d.names[j]).reverse(), x: order.map(j => res.model.importance[j]).reverse(), marker: { color: COLORS[0] }
+        }], layout('Predictor Importance (share of impurity reduction)', 'Relative importance', '', { height: 150 + 26 * d.names.length, margin: { l: 140, r: 24, t: 48, b: 48 } })));
+      }
+      if (res.model.coef) {
+        out.push(H('Coefficients (standardized predictors)'), T(['Term'].concat(classes || ['Coefficient']),
+          [['Intercept'].concat(res.model.intercept.map(g))].concat(d.names.map((nm, j) => [nm].concat(res.model.coef.map(c => g(c[j])))))));
+      }
+      if (v.store) {
+        const all = ML.predict(res.model, d.X, K).pred, len = d.rows[d.rows.length - 1] + 1;
+        const pred = new Array(len).fill(''), set = new Array(len).fill('');
+        const role = new Map(res.train.idx.map(i => [lab[i], 'Train']).concat(cv ? [] : res.test.idx.map(i => [lab[i], 'Test'])));
+        d.rows.forEach((r, j) => { pred[r] = fmt(all[j]); set[r] = role.get(j) || 'New'; });
+        S.addColumns([{ name: 'Pred ' + S.label(v.y), data: pred }, { name: 'Set', data: set }]);
+        out.push(Note('Predictions were stored in the worksheet' + (unlabeled ? `, including ${unlabeled} row(s) that have predictors but no response (Set = New).` : '.')
+          + (cv ? ' They come from the model refitted on all rows.' : '')));
+      }
+      return out;
+    };
+    return { res, y, K, classes, cv, out, finish, evalName: cv ? 'Cross-validation' : 'Test set' };
+  }
+
+  A.classify = {
+    title: 'Classification',
+    fields: mlFields('class'),
+    run(v) {
+      const m = mlRun(v, 'class'), { res, y, K, classes, out } = m;
+      const yTr = ML.pick(y, res.train.idx), yTe = ML.pick(y, res.test.idx);
+      const cm = ML.confusion(yTe, res.test.pred, K), rep = ML.classReport(cm);
+      const roc = K === 2 ? ML.roc(yTe.map(c => c === 1), res.test.proba.map(p => p[1])) : null;
+      const base = Math.max(...cm.map(r => M.sum(r))) / yTe.length;
+      out.push(H('Accuracy'), T(['Set', 'N', 'Accuracy'].concat(roc ? ['AUC'] : []), [
+        [m.cv ? 'Training (model fitted on all rows)' : 'Training set', String(yTr.length), pct(ML.accuracy(yTr, res.train.pred))].concat(roc ? [''] : []),
+        [m.evalName, String(yTe.length), pct(ML.accuracy(yTe, res.test.pred))].concat(roc ? [roc.auc.toFixed(3)] : [])]));
+      out.push(Note(`Baseline: always predicting the most common class would score ${pct(base)} on the ${m.evalName.toLowerCase()} rows.`
+        + (m.cv ? ` Fold accuracies: mean ${pct(M.mean(res.folds))}, StDev ${pct(M.sd(res.folds))}.` : '')));
+      out.push(H(`Confusion matrix (${m.evalName.toLowerCase()}; rows are actual, columns are predicted)`),
+        T(['Actual'].concat(classes, ['Total']), cm.map((r, i) => [classes[i]].concat(r.map(String), [String(M.sum(r))]))),
+        H('By class'),
+        T(['Class', 'Precision', 'Recall', 'F1', 'Support'], rep.map((r, i) => [classes[i], g(r.precision), g(r.recall), g(r.f1), String(r.support)])),
+        Plot([{
+          type: 'heatmap', z: cm, x: classes, y: classes, colorscale: [[0, '#f3f7fb'], [1, '#1f6fb2']], showscale: false,
+          text: cm.map(r => r.map(String)), texttemplate: '%{text}', textfont: { size: 14 }, xgap: 2, ygap: 2
+        }], layout(`Confusion Matrix (${m.evalName})`, 'Predicted', 'Actual', {
+          height: 240 + 40 * K, xaxis: axis('Predicted', { type: 'category' }), yaxis: axis('Actual', { type: 'category', autorange: 'reversed' })
+        })));
+      if (roc) out.push(Plot([
+        { type: 'scatter', mode: 'lines', x: [0, 1], y: [0, 1], line: { color: '#9aa3af', dash: 'dot', width: 1 }, hoverinfo: 'skip' },
+        { type: 'scatter', mode: 'lines', x: roc.fpr, y: roc.tpr, line: { color: COLORS[0], width: 2 } }
+      ], layout(`ROC Curve for "${classes[1]}" (${m.evalName}), AUC = ${roc.auc.toFixed(3)}`, 'False positive rate', 'True positive rate', { height: 400 })));
+      return m.finish();
+    }
+  };
+
+  A.mlreg = {
+    title: 'Regression (Machine Learning)',
+    fields: mlFields('reg'),
+    run(v) {
+      const m = mlRun(v, 'reg'), { res, y, out } = m, yn = S.label(v.y);
+      const yTr = ML.pick(y, res.train.idx), yTe = ML.pick(y, res.test.idx);
+      const row = (name, a, p) => { const r = ML.regMetrics(a, p); return [name, String(r.n), pct(r.r2), g(r.rmse), g(r.mae)]; };
+      out.push(H('Fit'), T(['Set', 'N', 'R-sq', 'RMSE', 'MAE'], [
+        row(m.cv ? 'Training (model fitted on all rows)' : 'Training set', yTr, res.train.pred), row(m.evalName, yTe, res.test.pred)]));
+      out.push(Note(`RMSE and MAE are in the units of ${yn}. R-sq on the ${m.evalName.toLowerCase()} rows compares the model with predicting their mean.`
+        + (m.cv ? ` Fold RMSE: mean ${g(M.mean(res.folds))}, StDev ${g(M.sd(res.folds))}.` : '')));
+      const lo = Math.min(...yTe, ...res.test.pred), hi = Math.max(...yTe, ...res.test.pred);
+      out.push(Plot([
+        { type: 'scatter', mode: 'lines', x: [lo, hi], y: [lo, hi], line: { color: '#d1495b', width: 1.5 }, hoverinfo: 'skip' },
+        { type: 'scatter', mode: 'markers', x: res.test.pred, y: yTe, marker: { color: COLORS[0], size: 6, opacity: 0.8 } }
+      ], layout(`Actual vs Predicted ${yn} (${m.evalName})`, 'Predicted ' + yn, 'Actual ' + yn)),
+        Plot([{ type: 'scatter', mode: 'markers', x: res.test.pred, y: yTe.map((a, i) => a - res.test.pred[i]), marker: { color: COLORS[0], size: 6, opacity: 0.8 } }],
+          layout(`Residuals vs Predicted (${m.evalName})`, 'Predicted ' + yn, 'Residual', { yaxis: axis('Residual', { zeroline: true, zerolinecolor: '#9aa3af' }) })));
+      return m.finish();
+    }
+  };
+
   const MENU = {
     Stat: [
       ['Basic Statistics', ['desc', 'tally', 't1', 'z1', 't2', 'paired', 'p1', 'p2', 'var2', 'corr', 'normality']],
@@ -699,7 +853,8 @@ const Analyses = (function () {
       ['Tables', ['chisq']],
       ['Nonparametrics', ['wilcoxon', 'mw', 'kw']]
     ],
-    Graph: [['', ['scatter', 'matrix', 'hist', 'prob', 'box', 'indiv', 'interval', 'bar', 'pie', 'ts']]]
+    Graph: [['', ['scatter', 'matrix', 'hist', 'prob', 'box', 'indiv', 'interval', 'bar', 'pie', 'ts']]],
+    'Machine Learning': [['', ['classify', 'mlreg']]]
   };
 
   return { all: A, MENU };
